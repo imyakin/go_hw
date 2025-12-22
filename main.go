@@ -3,10 +3,20 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println("Hello world")
-}
+	size := 8
 
-func homework2() {
-	fmt.Println("This is hw2")
-	fmt.Println("new commit")
+	var board string
+
+	for i := 0; i < size; i++ {
+		for j := 0; j < size; j++ {
+			if (i+j)%2 == 0 {
+				board += " "
+			} else {
+				board += "#"
+			}
+		}
+		board += "\n"
+	}
+
+	fmt.Print(board)
 }
