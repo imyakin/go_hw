@@ -21,14 +21,14 @@ var blackPieces = map[string]string{
 }
 
 func main() {
-	size, _, _ := startGame()
+	size, player1, player2 := startGame()
 
 	// Calculate row number width for proper alignment
 	rowNumberWidth := len(fmt.Sprintf("%d", size))
 	// Build column header with letters A, B, C...
 	columnHeader := makeColumnHeader(size, rowNumberWidth)
-	// Build board with numbers
-	board := makeBoard(size, rowNumberWidth)
+	// Build board with numbers and player names
+	board := makeBoard(size, rowNumberWidth, player1, player2)
 
 	fmt.Print(columnHeader + board)
 }
@@ -63,8 +63,12 @@ func makeColumnHeader(size, rowNumberWidth int) string {
 	return columnHeader
 }
 
-func makeBoard(size, rowNumberWidth int) string {
+func makeBoard(size, rowNumberWidth int, player1, player2 string) string {
 	var board string
+
+	player1Row := 1    // White pieces (bottom)
+	player2Row := size // Black pieces (top)
+
 	for i := 0; i < size; i++ {
 		// Calculate display row number (bottom-to-top, like chess)
 		displayRowNum := size - i
@@ -83,6 +87,14 @@ func makeBoard(size, rowNumberWidth int) string {
 				}
 			}
 		}
+
+		// Add player names on the side
+		if displayRowNum == player1Row {
+			board += "  " + player1 + " (белые ♔)"
+		} else if displayRowNum == player2Row {
+			board += "  " + player2 + " (черные ♚)"
+		}
+
 		board += "\n"
 	}
 	return board
