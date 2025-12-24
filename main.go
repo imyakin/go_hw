@@ -2,15 +2,26 @@ package main
 
 import "fmt"
 
-func main() {
+func startGame() (int, string, string) {
+	var player1, player2 string
 	var size int
+
 	fmt.Print("Введите размер доски: ")
 	fmt.Scan(&size)
-
 	if size <= 0 {
 		fmt.Println("Ошибка: размер доски должен быть больше 0")
-		return
+		return 0, "", ""
 	}
+	fmt.Print("Введите имя игрока 1: ")
+	fmt.Scan(&player1)
+	fmt.Print("Введите имя игрока 2: ")
+	fmt.Scan(&player2)
+
+	return size, player1, player2
+}
+
+func main() {
+	size, _, _ := startGame()
 
 	var board string
 
