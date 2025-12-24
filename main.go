@@ -3,7 +3,14 @@ package main
 import "fmt"
 
 func main() {
-	size := 8
+	var size int
+	fmt.Print("Введите размер доски: ")
+	fmt.Scan(&size)
+
+	if size <= 0 {
+		fmt.Println("Ошибка: размер доски должен быть больше 0")
+		return
+	}
 
 	var board string
 
