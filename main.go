@@ -2,6 +2,24 @@ package main
 
 import "fmt"
 
+var whitePieces = map[string]string{
+	"king":   "♔",
+	"queen":  "♕",
+	"rook":   "♖",
+	"bishop": "♗",
+	"knight": "♘",
+	"pawn":   "♙",
+}
+
+var blackPieces = map[string]string{
+	"king":   "♚",
+	"queen":  "♛",
+	"rook":   "♜",
+	"bishop": "♝",
+	"knight": "♞",
+	"pawn":   "♟",
+}
+
 func main() {
 	size, _, _ := startGame()
 
@@ -54,13 +72,69 @@ func makeBoard(size, rowNumberWidth int) string {
 
 		board += rowLabel
 		for j := 0; j < size; j++ {
-			if (i+j)%2 == 0 {
-				board += " "
+			piece := getPieceAt(displayRowNum, j, size)
+			if piece != "" {
+				board += piece
 			} else {
-				board += "#"
+				if (i+j)%2 == 0 {
+					board += " "
+				} else {
+					board += "#"
+				}
 			}
 		}
 		board += "\n"
 	}
 	return board
+}
+
+func getPieceAt(row, col, size int) string {
+	// Only place pieces on 8x8 board or larger
+	if size < 8 {
+		return ""
+	}
+
+	// Black pieces on row 8
+	if row == size {
+		switch col {
+		case 0, 7:
+			return blackPieces["rook"]
+		case 1, 6:
+			return blackPieces["knight"]
+		case 2, 5:
+			return blackPieces["bishop"]
+		case 3:
+			return blackPieces["queen"]
+		case 4:
+			return blackPieces["king"]
+		}
+	}
+
+	// Black pawns on row 7
+	if row == size-1 && col < 8 {
+		return blackPieces["pawn"]
+	}
+
+	// White pawns on row 2
+	if row == 2 && col < 8 {
+		return whitePieces["pawn"]
+	}
+
+	// White pieces on row 1
+	if row == 1 {
+		switch col {
+		case 0, 7:
+			return whitePieces["rook"]
+		case 1, 6:
+			return whitePieces["knight"]
+		case 2, 5:
+			return whitePieces["bishop"]
+		case 3:
+			return whitePieces["queen"]
+		case 4:
+			return whitePieces["king"]
+		}
+	}
+
+	return ""
 }
