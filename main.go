@@ -27,14 +27,9 @@ var blackPieces = map[string]string{
 func main() {
 	size, player1, player2 := startGame()
 
-	// Calculate row number width for proper alignment
-	rowNumberWidth := len(fmt.Sprintf("%d", size))
-	// Build column header with letters A, B, C...
-	columnHeader := makeColumnHeader(size, rowNumberWidth)
-	// Build board with numbers and player names
-	board := makeBoard(size, rowNumberWidth, player1, player2)
-
-	fmt.Print(columnHeader + board)
+	board := model.NewBoard(size)
+	placePieces(board, size)
+	displayBoard(board, player1, player2)
 }
 
 func startGame() (int, *model.Player, *model.Player) {
@@ -58,6 +53,43 @@ func startGame() (int, *model.Player, *model.Player) {
 	return size, player1, player2
 }
 
+func placePieces(board *model.Board, size int) {
+	// Only place pieces on 8x8 board or larger
+	if size < 8 {
+		return
+	}
+
+	// Black pieces on row index 0 (displayed as row 8)
+	board.SetCell(0, 0, blackPieces["rook"])
+	board.SetCell(0, 1, blackPieces["knight"])
+	board.SetCell(0, 2, blackPieces["bishop"])
+	board.SetCell(0, 3, blackPieces["queen"])
+	board.SetCell(0, 4, blackPieces["king"])
+	board.SetCell(0, 5, blackPieces["bishop"])
+	board.SetCell(0, 6, blackPieces["knight"])
+	board.SetCell(0, 7, blackPieces["rook"])
+
+	// Black pawns on row index 1 (displayed as row 7)
+	for col := 0; col < 8; col++ {
+		board.SetCell(1, col, blackPieces["pawn"])
+	}
+
+	// White pawns on row index size-2 (displayed as row 2)
+	for col := 0; col < 8; col++ {
+		board.SetCell(size-2, col, whitePieces["pawn"])
+	}
+
+	// White pieces on row index size-1 (displayed as row 1)
+	board.SetCell(size-1, 0, whitePieces["rook"])
+	board.SetCell(size-1, 1, whitePieces["knight"])
+	board.SetCell(size-1, 2, whitePieces["bishop"])
+	board.SetCell(size-1, 3, whitePieces["queen"])
+	board.SetCell(size-1, 4, whitePieces["king"])
+	board.SetCell(size-1, 5, whitePieces["bishop"])
+	board.SetCell(size-1, 6, whitePieces["knight"])
+	board.SetCell(size-1, 7, whitePieces["rook"])
+}
+
 func makeColumnHeader(size, rowNumberWidth int) string {
 	columnHeader := ""
 	for i := 0; i < rowNumberWidth+1; i++ {
@@ -70,8 +102,12 @@ func makeColumnHeader(size, rowNumberWidth int) string {
 	return columnHeader
 }
 
-func makeBoard(size, rowNumberWidth int, player1, player2 *model.Player) string {
-	var board string
+func displayBoard(board *model.Board, player1, player2 *model.Player) {
+	size := board.Size
+	rowNumberWidth := len(fmt.Sprintf("%d", size))
+
+	// Print column header
+	fmt.Print(makeColumnHeader(size, rowNumberWidth))
 
 	player1Row := 1    // White pieces (bottom)
 	player2Row := size // Black pieces (top)
@@ -81,79 +117,28 @@ func makeBoard(size, rowNumberWidth int, player1, player2 *model.Player) string 
 		displayRowNum := size - i
 		rowLabel := fmt.Sprintf("%*d ", rowNumberWidth, displayRowNum)
 
-		board += rowLabel
+		fmt.Print(rowLabel)
 		for j := 0; j < size; j++ {
-			piece := getPieceAt(displayRowNum, j, size)
+			// Get cell content using GetCell method
+			piece := board.GetCell(i, j)
 			if piece != "" {
-				board += piece
+				fmt.Print(piece)
 			} else {
 				if (i+j)%2 == 0 {
-					board += " "
+					fmt.Print(" ")
 				} else {
-					board += "#"
+					fmt.Print("#")
 				}
 			}
 		}
 
 		// Add player names on the side
 		if displayRowNum == player1Row {
-			board += "  " + player1.GetDisplayName()
+			fmt.Print("  " + player1.GetDisplayName())
 		} else if displayRowNum == player2Row {
-			board += "  " + player2.GetDisplayName()
+			fmt.Print("  " + player2.GetDisplayName())
 		}
 
-		board += "\n"
+		fmt.Println()
 	}
-	return board
-}
-
-func getPieceAt(row, col, size int) string {
-	// Only place pieces on 8x8 board or larger
-	if size < 8 {
-		return ""
-	}
-
-	// Black pieces on row 8
-	if row == size {
-		switch col {
-		case 0, 7:
-			return blackPieces["rook"]
-		case 1, 6:
-			return blackPieces["knight"]
-		case 2, 5:
-			return blackPieces["bishop"]
-		case 3:
-			return blackPieces["queen"]
-		case 4:
-			return blackPieces["king"]
-		}
-	}
-
-	// Black pawns on row 7
-	if row == size-1 && col < 8 {
-		return blackPieces["pawn"]
-	}
-
-	// White pawns on row 2
-	if row == 2 && col < 8 {
-		return whitePieces["pawn"]
-	}
-
-	// White pieces on row 1
-	if row == 1 {
-		switch col {
-		case 0, 7:
-			return whitePieces["rook"]
-		case 1, 6:
-			return whitePieces["knight"]
-		case 2, 5:
-			return whitePieces["bishop"]
-		case 3:
-			return whitePieces["queen"]
-		case 4:
-			return whitePieces["king"]
-		}
-	}
-
-	return ""
 }
