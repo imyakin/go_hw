@@ -25,17 +25,20 @@ var blackPieces = map[string]string{
 }
 
 func main() {
-	size, player1, player2 := startGame()
+	game := startGame()
+	if game == nil {
+		return
+	}
 
-	board := model.NewBoard(size)
-	placePieces(board, size)
-	displayBoard(board, player1, player2)
+	placePieces(game.Board, game.Board.Size)
+	game.Start()
+	displayBoard(game)
 
 	// Game loop
-	gameLoop(board, player1, player2)
+	gameLoop(game)
 }
 
-func startGame() (int, *model.Player, *model.Player) {
+func startGame() *model.Game {
 	var player1Name, player2Name string
 	var size int
 
@@ -43,17 +46,15 @@ func startGame() (int, *model.Player, *model.Player) {
 	fmt.Scan(&size)
 	if size <= 0 {
 		fmt.Println("Ошибка: размер доски должен быть больше 0")
-		return 0, nil, nil
+		return nil
 	}
 	fmt.Print("Введите имя игрока 1: ")
 	fmt.Scan(&player1Name)
 	fmt.Print("Введите имя игрока 2: ")
 	fmt.Scan(&player2Name)
 
-	player1 := model.NewPlayer(player1Name, model.White)
-	player2 := model.NewPlayer(player2Name, model.Black)
-
-	return size, player1, player2
+	game := model.NewGame(player1Name, player2Name, size)
+	return game
 }
 
 func placePieces(board *model.Board, size int) {
@@ -105,7 +106,8 @@ func makeColumnHeader(size, rowNumberWidth int) string {
 	return columnHeader
 }
 
-func displayBoard(board *model.Board, player1, player2 *model.Player) {
+func displayBoard(game *model.Game) {
+	board := game.Board
 	size := board.Size
 	rowNumberWidth := len(fmt.Sprintf("%d", size))
 
@@ -137,54 +139,50 @@ func displayBoard(board *model.Board, player1, player2 *model.Player) {
 
 		// Add player names on the side
 		if displayRowNum == player1Row {
-			fmt.Print("  " + player1.GetDisplayName())
+			fmt.Print("  " + game.WhitePlayer.GetDisplayName())
 		} else if displayRowNum == player2Row {
-			fmt.Print("  " + player2.GetDisplayName())
+			fmt.Print("  " + game.BlackPlayer.GetDisplayName())
 		}
 
 		fmt.Println()
 	}
 }
 
-func gameLoop(board *model.Board, player1, player2 *model.Player) {
-	currentPlayer := player1
-
-	for {
-		fmt.Printf("\n%s, ваш ход (формат: e2-e4 или 'exit' для выхода): ", currentPlayer.GetDisplayName())
+func gameLoop(game *model.Game) {
+	for game.IsInProgress() {
+		fmt.Printf("\n%s, ваш ход (формат: e2-e4 или 'exit' для выхода): ", game.CurrentPlayer.GetDisplayName())
 
 		var input string
 		fmt.Scan(&input)
 
 		if input == "exit" || input == "quit" {
+			game.Finish()
 			fmt.Println("Игра завершена!")
+			fmt.Printf("Всего ходов: %d\n", game.GetMoveCount())
 			break
 		}
 
-		move, err := parseMove(input, currentPlayer, board)
+		move, err := parseMove(input, game.CurrentPlayer, game.Board)
 		if err != nil {
 			fmt.Printf("Ошибка: %v\n", err)
 			continue
 		}
 
-		if !move.IsValid(board) {
+		if !move.IsValid(game.Board) {
 			fmt.Println("Ошибка: неверные координаты хода")
 			continue
 		}
 
-		if err := applyMove(board, move); err != nil {
+		if err := applyMove(game.Board, move); err != nil {
 			fmt.Printf("Ошибка: %v\n", err)
 			continue
 		}
 
-		fmt.Println()
-		displayBoard(board, player1, player2)
+		// Add move to game history and switch player
+		game.MakeMove(move)
 
-		// Switch player
-		if currentPlayer == player1 {
-			currentPlayer = player2
-		} else {
-			currentPlayer = player1
-		}
+		fmt.Println()
+		displayBoard(game)
 	}
 }
 
