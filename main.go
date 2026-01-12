@@ -30,6 +30,9 @@ func main() {
 	board := model.NewBoard(size)
 	placePieces(board, size)
 	displayBoard(board, player1, player2)
+
+	// Game loop
+	gameLoop(board, player1, player2)
 }
 
 func startGame() (int, *model.Player, *model.Player) {
@@ -141,4 +144,94 @@ func displayBoard(board *model.Board, player1, player2 *model.Player) {
 
 		fmt.Println()
 	}
+}
+
+func gameLoop(board *model.Board, player1, player2 *model.Player) {
+	currentPlayer := player1
+
+	for {
+		fmt.Printf("\n%s, ваш ход (формат: e2-e4 или 'exit' для выхода): ", currentPlayer.GetDisplayName())
+
+		var input string
+		fmt.Scan(&input)
+
+		if input == "exit" || input == "quit" {
+			fmt.Println("Игра завершена!")
+			break
+		}
+
+		move, err := parseMove(input, currentPlayer, board)
+		if err != nil {
+			fmt.Printf("Ошибка: %v\n", err)
+			continue
+		}
+
+		if !move.IsValid(board) {
+			fmt.Println("Ошибка: неверные координаты хода")
+			continue
+		}
+
+		if err := applyMove(board, move); err != nil {
+			fmt.Printf("Ошибка: %v\n", err)
+			continue
+		}
+
+		fmt.Println()
+		displayBoard(board, player1, player2)
+
+		// Switch player
+		if currentPlayer == player1 {
+			currentPlayer = player2
+		} else {
+			currentPlayer = player1
+		}
+	}
+}
+
+func parseMove(input string, player *model.Player, board *model.Board) (*model.Move, error) {
+	if len(input) < 5 || input[2] != '-' {
+		return nil, fmt.Errorf("неверный формат хода. Используйте формат: e2-e4")
+	}
+
+	fromCol := convertColumnToIndex(input[0])
+	fromRow := int(input[1] - '1')
+	toCol := convertColumnToIndex(input[3])
+	toRow := int(input[4] - '1')
+
+	if fromCol < 0 || toCol < 0 {
+		return nil, fmt.Errorf("неверная колонка")
+	}
+
+	// Convert display row to actual board row (inverted)
+	fromRowActual := board.Size - 1 - fromRow
+	toRowActual := board.Size - 1 - toRow
+
+	piece := board.GetCell(fromRowActual, fromCol)
+	if piece == "" {
+		return nil, fmt.Errorf("на клетке %c%d нет фигуры", input[0], fromRow+1)
+	}
+
+	return model.NewMove(fromRowActual, fromCol, toRowActual, toCol, player, piece), nil
+}
+
+func applyMove(board *model.Board, move *model.Move) error {
+	piece := board.GetCell(move.From.Row, move.From.Col)
+	if piece == "" {
+		return fmt.Errorf("нет фигуры на начальной позиции")
+	}
+
+	board.SetCell(move.To.Row, move.To.Col, piece)
+	board.SetCell(move.From.Row, move.From.Col, "")
+
+	return nil
+}
+
+func convertColumnToIndex(col byte) int {
+	if col >= 'a' && col <= 'z' {
+		return int(col - 'a')
+	}
+	if col >= 'A' && col <= 'Z' {
+		return int(col - 'A')
+	}
+	return -1
 }
