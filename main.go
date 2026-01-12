@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/imyakin/go_hw/internal/model"
+)
 
 var whitePieces = map[string]string{
 	"king":   "♔",
@@ -33,20 +37,23 @@ func main() {
 	fmt.Print(columnHeader + board)
 }
 
-func startGame() (int, string, string) {
-	var player1, player2 string
+func startGame() (int, *model.Player, *model.Player) {
+	var player1Name, player2Name string
 	var size int
 
 	fmt.Print("Введите размер доски: ")
 	fmt.Scan(&size)
 	if size <= 0 {
 		fmt.Println("Ошибка: размер доски должен быть больше 0")
-		return 0, "", ""
+		return 0, nil, nil
 	}
 	fmt.Print("Введите имя игрока 1: ")
-	fmt.Scan(&player1)
+	fmt.Scan(&player1Name)
 	fmt.Print("Введите имя игрока 2: ")
-	fmt.Scan(&player2)
+	fmt.Scan(&player2Name)
+
+	player1 := model.NewPlayer(player1Name, model.White)
+	player2 := model.NewPlayer(player2Name, model.Black)
 
 	return size, player1, player2
 }
@@ -63,7 +70,7 @@ func makeColumnHeader(size, rowNumberWidth int) string {
 	return columnHeader
 }
 
-func makeBoard(size, rowNumberWidth int, player1, player2 string) string {
+func makeBoard(size, rowNumberWidth int, player1, player2 *model.Player) string {
 	var board string
 
 	player1Row := 1    // White pieces (bottom)
@@ -90,9 +97,9 @@ func makeBoard(size, rowNumberWidth int, player1, player2 string) string {
 
 		// Add player names on the side
 		if displayRowNum == player1Row {
-			board += "  " + player1 + " (белые ♔)"
+			board += "  " + player1.GetDisplayName()
 		} else if displayRowNum == player2Row {
-			board += "  " + player2 + " (черные ♚)"
+			board += "  " + player2.GetDisplayName()
 		}
 
 		board += "\n"
