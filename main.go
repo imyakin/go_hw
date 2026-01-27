@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/imyakin/go_hw/internal/model"
+)
 
 var whitePieces = map[string]string{
 	"king":   "♔",
@@ -21,34 +25,73 @@ var blackPieces = map[string]string{
 }
 
 func main() {
-	size, player1, player2 := startGame()
+	game := startGame()
+	if game == nil {
+		return
+	}
 
-	// Calculate row number width for proper alignment
-	rowNumberWidth := len(fmt.Sprintf("%d", size))
-	// Build column header with letters A, B, C...
-	columnHeader := makeColumnHeader(size, rowNumberWidth)
-	// Build board with numbers and player names
-	board := makeBoard(size, rowNumberWidth, player1, player2)
+	placePieces(game.Board, game.Board.Size)
+	game.Start()
+	displayBoard(game)
 
-	fmt.Print(columnHeader + board)
+	// Game loop
+	gameLoop(game)
 }
 
-func startGame() (int, string, string) {
-	var player1, player2 string
+func startGame() *model.Game {
+	var player1Name, player2Name string
 	var size int
 
 	fmt.Print("Введите размер доски: ")
 	fmt.Scan(&size)
 	if size <= 0 {
 		fmt.Println("Ошибка: размер доски должен быть больше 0")
-		return 0, "", ""
+		return nil
 	}
 	fmt.Print("Введите имя игрока 1: ")
-	fmt.Scan(&player1)
+	fmt.Scan(&player1Name)
 	fmt.Print("Введите имя игрока 2: ")
-	fmt.Scan(&player2)
+	fmt.Scan(&player2Name)
 
-	return size, player1, player2
+	game := model.NewGame(player1Name, player2Name, size)
+	return game
+}
+
+func placePieces(board *model.Board, size int) {
+	// Only place pieces on 8x8 board or larger
+	if size < 8 {
+		return
+	}
+
+	// Black pieces on row index 0 (displayed as row 8)
+	board.SetCell(0, 0, blackPieces["rook"])
+	board.SetCell(0, 1, blackPieces["knight"])
+	board.SetCell(0, 2, blackPieces["bishop"])
+	board.SetCell(0, 3, blackPieces["queen"])
+	board.SetCell(0, 4, blackPieces["king"])
+	board.SetCell(0, 5, blackPieces["bishop"])
+	board.SetCell(0, 6, blackPieces["knight"])
+	board.SetCell(0, 7, blackPieces["rook"])
+
+	// Black pawns on row index 1 (displayed as row 7)
+	for col := 0; col < 8; col++ {
+		board.SetCell(1, col, blackPieces["pawn"])
+	}
+
+	// White pawns on row index size-2 (displayed as row 2)
+	for col := 0; col < 8; col++ {
+		board.SetCell(size-2, col, whitePieces["pawn"])
+	}
+
+	// White pieces on row index size-1 (displayed as row 1)
+	board.SetCell(size-1, 0, whitePieces["rook"])
+	board.SetCell(size-1, 1, whitePieces["knight"])
+	board.SetCell(size-1, 2, whitePieces["bishop"])
+	board.SetCell(size-1, 3, whitePieces["queen"])
+	board.SetCell(size-1, 4, whitePieces["king"])
+	board.SetCell(size-1, 5, whitePieces["bishop"])
+	board.SetCell(size-1, 6, whitePieces["knight"])
+	board.SetCell(size-1, 7, whitePieces["rook"])
 }
 
 func makeColumnHeader(size, rowNumberWidth int) string {
@@ -63,8 +106,13 @@ func makeColumnHeader(size, rowNumberWidth int) string {
 	return columnHeader
 }
 
-func makeBoard(size, rowNumberWidth int, player1, player2 string) string {
-	var board string
+func displayBoard(game *model.Game) {
+	board := game.Board
+	size := board.Size
+	rowNumberWidth := len(fmt.Sprintf("%d", size))
+
+	// Print column header
+	fmt.Print(makeColumnHeader(size, rowNumberWidth))
 
 	player1Row := 1    // White pieces (bottom)
 	player2Row := size // Black pieces (top)
@@ -74,79 +122,114 @@ func makeBoard(size, rowNumberWidth int, player1, player2 string) string {
 		displayRowNum := size - i
 		rowLabel := fmt.Sprintf("%*d ", rowNumberWidth, displayRowNum)
 
-		board += rowLabel
+		fmt.Print(rowLabel)
 		for j := 0; j < size; j++ {
-			piece := getPieceAt(displayRowNum, j, size)
+			// Get cell content using GetCell method
+			piece := board.GetCell(i, j)
 			if piece != "" {
-				board += piece
+				fmt.Print(piece)
 			} else {
 				if (i+j)%2 == 0 {
-					board += " "
+					fmt.Print(" ")
 				} else {
-					board += "#"
+					fmt.Print("#")
 				}
 			}
 		}
 
 		// Add player names on the side
 		if displayRowNum == player1Row {
-			board += "  " + player1 + " (белые ♔)"
+			fmt.Print("  " + game.WhitePlayer.GetDisplayName())
 		} else if displayRowNum == player2Row {
-			board += "  " + player2 + " (черные ♚)"
+			fmt.Print("  " + game.BlackPlayer.GetDisplayName())
 		}
 
-		board += "\n"
+		fmt.Println()
 	}
-	return board
 }
 
-func getPieceAt(row, col, size int) string {
-	// Only place pieces on 8x8 board or larger
-	if size < 8 {
-		return ""
-	}
+func gameLoop(game *model.Game) {
+	for game.IsInProgress() {
+		fmt.Printf("\n%s, ваш ход (формат: e2-e4 или 'exit' для выхода): ", game.CurrentPlayer.GetDisplayName())
 
-	// Black pieces on row 8
-	if row == size {
-		switch col {
-		case 0, 7:
-			return blackPieces["rook"]
-		case 1, 6:
-			return blackPieces["knight"]
-		case 2, 5:
-			return blackPieces["bishop"]
-		case 3:
-			return blackPieces["queen"]
-		case 4:
-			return blackPieces["king"]
+		var input string
+		fmt.Scan(&input)
+
+		if input == "exit" || input == "quit" {
+			game.Finish()
+			fmt.Println("Игра завершена!")
+			fmt.Printf("Всего ходов: %d\n", game.GetMoveCount())
+			break
 		}
-	}
 
-	// Black pawns on row 7
-	if row == size-1 && col < 8 {
-		return blackPieces["pawn"]
-	}
-
-	// White pawns on row 2
-	if row == 2 && col < 8 {
-		return whitePieces["pawn"]
-	}
-
-	// White pieces on row 1
-	if row == 1 {
-		switch col {
-		case 0, 7:
-			return whitePieces["rook"]
-		case 1, 6:
-			return whitePieces["knight"]
-		case 2, 5:
-			return whitePieces["bishop"]
-		case 3:
-			return whitePieces["queen"]
-		case 4:
-			return whitePieces["king"]
+		move, err := parseMove(input, game.CurrentPlayer, game.Board)
+		if err != nil {
+			fmt.Printf("Ошибка: %v\n", err)
+			continue
 		}
+
+		if !move.IsValid(game.Board) {
+			fmt.Println("Ошибка: неверные координаты хода")
+			continue
+		}
+
+		if err := applyMove(game.Board, move); err != nil {
+			fmt.Printf("Ошибка: %v\n", err)
+			continue
+		}
+
+		// Add move to game history and switch player
+		game.MakeMove(move)
+
+		fmt.Println()
+		displayBoard(game)
+	}
+}
+
+func parseMove(input string, player *model.Player, board *model.Board) (*model.Move, error) {
+	if len(input) < 5 || input[2] != '-' {
+		return nil, fmt.Errorf("неверный формат хода. Используйте формат: e2-e4")
 	}
 
-	return ""
+	fromCol := convertColumnToIndex(input[0])
+	fromRow := int(input[1] - '1')
+	toCol := convertColumnToIndex(input[3])
+	toRow := int(input[4] - '1')
+
+	if fromCol < 0 || toCol < 0 {
+		return nil, fmt.Errorf("неверная колонка")
+	}
+
+	// Convert display row to actual board row (inverted)
+	fromRowActual := board.Size - 1 - fromRow
+	toRowActual := board.Size - 1 - toRow
+
+	piece := board.GetCell(fromRowActual, fromCol)
+	if piece == "" {
+		return nil, fmt.Errorf("на клетке %c%d нет фигуры", input[0], fromRow+1)
+	}
+
+	return model.NewMove(fromRowActual, fromCol, toRowActual, toCol, player, piece), nil
+}
+
+func applyMove(board *model.Board, move *model.Move) error {
+	piece := board.GetCell(move.From.Row, move.From.Col)
+	if piece == "" {
+		return fmt.Errorf("нет фигуры на начальной позиции")
+	}
+
+	board.SetCell(move.To.Row, move.To.Col, piece)
+	board.SetCell(move.From.Row, move.From.Col, "")
+
+	return nil
+}
+
+func convertColumnToIndex(col byte) int {
+	if col >= 'a' && col <= 'z' {
+		return int(col - 'a')
+	}
+	if col >= 'A' && col <= 'Z' {
+		return int(col - 'A')
+	}
+	return -1
 }
