@@ -83,6 +83,10 @@ func (g *Game) GetMoveCount() int {
 	return len(g.Moves)
 }
 
+func (g *Game) EntityType() string {
+	return "Game"
+}
+
 func (g *Game) Resign() {
 	if g.CurrentPlayer == g.WhitePlayer {
 		g.Winner = g.BlackPlayer

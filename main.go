@@ -2,9 +2,13 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/imyakin/go_hw/internal/model"
+	"github.com/imyakin/go_hw/internal/repository"
+	"github.com/imyakin/go_hw/internal/service"
 )
 
 var whitePieces = map[string]string{
@@ -35,8 +39,27 @@ func main() {
 	game.Start()
 	displayBoard(game)
 
+	// Start entity generation ticker
+	ticker := time.NewTicker(1 * time.Second)
+	done := make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				service.GenerateEntities(repository.Store)
+			}
+		}
+	}()
+
 	// Game loop
 	gameLoop(game)
+
+	// Stop ticker and print stats
+	ticker.Stop()
+	done <- true
+	repository.PrintStats()
 }
 
 func startGame() *model.Game {
@@ -226,6 +249,11 @@ func isPlayerPiece(piece string, player *model.Player) bool {
 }
 
 func autoMove(game *model.Game) error {
+	// Random delay 2-4 seconds
+	delay := time.Duration(2+rand.Intn(3)) * time.Second
+	fmt.Printf("Думаю... (%v)\n", delay)
+	time.Sleep(delay)
+
 	board := game.Board
 	player := game.CurrentPlayer
 

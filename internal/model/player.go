@@ -34,6 +34,10 @@ func (p *Player) IsBlack() bool {
 	return p.Color == Black
 }
 
+func (p *Player) EntityType() string {
+	return "Player"
+}
+
 func (p *Player) GetDisplayName() string {
 	colorName := "белые"
 	if p.Color == Black {

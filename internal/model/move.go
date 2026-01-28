@@ -32,6 +32,10 @@ func (m *Move) IsValid(board *Board) bool {
 		board.IsValidPosition(m.To.Row, m.To.Col)
 }
 
+func (m *Move) EntityType() string {
+	return "Move"
+}
+
 func (m *Move) GetNotation() string {
 	cols := "abcdefgh"
 	if m.From.Col < len(cols) && m.To.Col < len(cols) {

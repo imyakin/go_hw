@@ -33,3 +33,7 @@ func (b *Board) SetCell(row, col int, piece string) {
 func (b *Board) IsValidPosition(row, col int) bool {
 	return row >= 0 && row < b.Size && col >= 0 && col < b.Size
 }
+
+func (b *Board) EntityType() string {
+	return "Board"
+}
