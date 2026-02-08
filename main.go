@@ -2,8 +2,13 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
+	"strings"
+	"time"
 
 	"github.com/imyakin/go_hw/internal/model"
+	"github.com/imyakin/go_hw/internal/repository"
+	"github.com/imyakin/go_hw/internal/service"
 )
 
 var whitePieces = map[string]string{
@@ -34,8 +39,27 @@ func main() {
 	game.Start()
 	displayBoard(game)
 
+	// Start entity generation ticker
+	ticker := time.NewTicker(1 * time.Second)
+	done := make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				service.GenerateEntities(repository.Store)
+			}
+		}
+	}()
+
 	// Game loop
 	gameLoop(game)
+
+	// Stop ticker and print stats
+	ticker.Stop()
+	done <- true
+	repository.PrintStats()
 }
 
 func startGame() *model.Game {
@@ -150,11 +174,12 @@ func displayBoard(game *model.Game) {
 
 func gameLoop(game *model.Game) {
 	for game.IsInProgress() {
-		fmt.Printf("\n%s, ваш ход (формат: e2-e4 или 'exit' для выхода): ", game.CurrentPlayer.GetDisplayName())
+		fmt.Printf("\n%s, ваш ход (формат: e2-e4 или 'exit' для выхода или 'Автоход' или 'Сдался'): ", game.CurrentPlayer.GetDisplayName())
 
 		var input string
 		fmt.Scan(&input)
 
+		// 1. exit / quit
 		if input == "exit" || input == "quit" {
 			game.Finish()
 			fmt.Println("Игра завершена!")
@@ -162,6 +187,36 @@ func gameLoop(game *model.Game) {
 			break
 		}
 
+		// 2. Сдался
+		if strings.EqualFold(input, "Сдался") {
+			resigned := game.CurrentPlayer
+			game.Resign()
+			fmt.Printf("%s сдался! Победил %s!\n", resigned.GetDisplayName(), game.Winner.GetDisplayName())
+			break
+		}
+
+		// 3. Автоход
+		if strings.EqualFold(input, "Автоход") {
+			fmt.Print("Сколько автоходов сделать: ")
+			var count int
+			_, err := fmt.Scan(&count)
+			if err != nil || count <= 0 {
+				fmt.Println("Ошибка: введите положительное число")
+				continue
+			}
+			for i := 0; i < count; i++ {
+				if !game.IsInProgress() {
+					break
+				}
+				if err := autoMove(game); err != nil {
+					fmt.Printf("Ошибка автохода: %v\n", err)
+					break
+				}
+			}
+			continue
+		}
+
+		// 4. Обычный ход
 		move, err := parseMove(input, game.CurrentPlayer, game.Board)
 		if err != nil {
 			fmt.Printf("Ошибка: %v\n", err)
@@ -184,6 +239,67 @@ func gameLoop(game *model.Game) {
 		fmt.Println()
 		displayBoard(game)
 	}
+}
+
+func isPlayerPiece(piece string, player *model.Player) bool {
+	if player.IsWhite() {
+		return piece == "♔" || piece == "♕" || piece == "♖" || piece == "♗" || piece == "♘" || piece == "♙"
+	}
+	return piece == "♚" || piece == "♛" || piece == "♜" || piece == "♝" || piece == "♞" || piece == "♟"
+}
+
+func autoMove(game *model.Game) error {
+	// Random delay 2-4 seconds
+	delay := time.Duration(2+rand.Intn(3)) * time.Second
+	fmt.Printf("Думаю... (%v)\n", delay)
+	time.Sleep(delay)
+
+	board := game.Board
+	player := game.CurrentPlayer
+
+	for row := 0; row < board.Size; row++ {
+		for col := 0; col < board.Size; col++ {
+			piece := board.GetCell(row, col)
+			if piece == "" || !isPlayerPiece(piece, player) {
+				continue
+			}
+
+			// Determine target row
+			var targetRow int
+			if player.IsWhite() {
+				targetRow = row - 1
+			} else {
+				targetRow = row + 1
+			}
+
+			if !board.IsValidPosition(targetRow, col) {
+				continue
+			}
+
+			targetPiece := board.GetCell(targetRow, col)
+			if targetPiece != "" && isPlayerPiece(targetPiece, player) {
+				continue
+			}
+
+			move := model.NewMove(row, col, targetRow, col, player, piece)
+
+			if err := applyMove(board, move); err != nil {
+				continue
+			}
+			game.MakeMove(move)
+
+			// Format move notation
+			fromCol := string(rune('a' + col))
+			fromRow := board.Size - row
+			toCol := string(rune('a' + col))
+			toRow := board.Size - targetRow
+			fmt.Printf("Автоход: %s%d-%s%d\n", fromCol, fromRow, toCol, toRow)
+			displayBoard(game)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("нет доступных ходов для %s", player.GetDisplayName())
 }
 
 func parseMove(input string, player *model.Player, board *model.Board) (*model.Move, error) {

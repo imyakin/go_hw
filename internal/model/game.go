@@ -15,6 +15,7 @@ type Game struct {
 	Moves         []*Move
 	CurrentPlayer *Player
 	Status        GameStatus
+	Winner        *Player
 }
 
 func NewGame(whitePlayerName, blackPlayerName string, boardSize int) *Game {
@@ -80,4 +81,17 @@ func (g *Game) GetMoveHistory() []*Move {
 
 func (g *Game) GetMoveCount() int {
 	return len(g.Moves)
+}
+
+func (g *Game) EntityType() string {
+	return "Game"
+}
+
+func (g *Game) Resign() {
+	if g.CurrentPlayer == g.WhitePlayer {
+		g.Winner = g.BlackPlayer
+	} else {
+		g.Winner = g.WhitePlayer
+	}
+	g.Finish()
 }
