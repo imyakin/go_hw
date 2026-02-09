@@ -1,5 +1,10 @@
 package model
 
+import (
+	"sync"
+	"time"
+)
+
 type GameStatus string
 
 const (
@@ -16,6 +21,11 @@ type Game struct {
 	CurrentPlayer *Player
 	Status        GameStatus
 	Winner        *Player
+	Mu            sync.RWMutex
+	LastMoveTime  time.Duration
+	LastWhiteTime time.Duration
+	LastBlackTime time.Duration
+	MoveStartTime time.Time
 }
 
 func NewGame(whitePlayerName, blackPlayerName string, boardSize int) *Game {

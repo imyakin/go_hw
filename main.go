@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/imyakin/go_hw/internal/model"
@@ -29,15 +30,73 @@ var blackPieces = map[string]string{
 	"pawn":   "♟",
 }
 
+type GameManager struct {
+	games []*model.Game
+	mu    sync.RWMutex
+}
+
+func NewGameManager() *GameManager {
+	return &GameManager{
+		games: make([]*model.Game, 0),
+	}
+}
+
+func (m *GameManager) AddGame(game *model.Game) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.games = append(m.games, game)
+}
+
+func (m *GameManager) GetGames() []*model.Game {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	copied := make([]*model.Game, len(m.games))
+	copy(copied, m.games)
+	return copied
+}
+
+func (m *GameManager) RemoveFinishedGames() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.games) == 0 {
+		return
+	}
+	remaining := make([]*model.Game, 0, len(m.games))
+	for _, game := range m.games {
+		game.Mu.RLock()
+		finished := game.IsFinished()
+		game.Mu.RUnlock()
+		if finished {
+			repository.RemoveGame(game)
+			continue
+		}
+		remaining = append(remaining, game)
+	}
+	m.games = remaining
+}
+
+func (m *GameManager) GetGameCount() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.games)
+}
+
 func main() {
-	game := startGame()
-	if game == nil {
+	games := startGames()
+	if len(games) == 0 {
 		return
 	}
 
-	placePieces(game.Board, game.Board.Size)
-	game.Start()
-	displayBoard(game)
+	manager := NewGameManager()
+	for _, game := range games {
+		placePieces(game.Board, game.Board.Size)
+		game.Start()
+		manager.AddGame(game)
+		repository.Store(game)
+		repository.Store(game.Board)
+		repository.Store(game.WhitePlayer)
+		repository.Store(game.BlackPlayer)
+	}
 
 	// Start entity generation ticker
 	ticker := time.NewTicker(1 * time.Second)
@@ -53,32 +112,68 @@ func main() {
 		}
 	}()
 
-	// Game loop
-	gameLoop(game)
+	// Slice change logger
+	logDone := make(chan struct{})
+	go sliceLogger(logDone)
+
+	if manager.GetGameCount() == 1 {
+		game := manager.GetGames()[0]
+		displayBoard(game, 1)
+		gameLoop(game)
+	} else {
+		updateCh := make(chan []*model.Game, 16)
+		renderDone := make(chan struct{})
+		simDone := make(chan struct{})
+
+		go gameSimulator(manager, updateCh, simDone)
+		go boardRenderer(manager, updateCh, renderDone)
+
+		// Wait until all games are finished
+		for manager.GetGameCount() > 0 {
+			time.Sleep(200 * time.Millisecond)
+		}
+		close(simDone)
+		close(renderDone)
+	}
 
 	// Stop ticker and print stats
 	ticker.Stop()
 	done <- true
+	close(logDone)
 	repository.PrintStats()
 }
 
-func startGame() *model.Game {
+func startGames() []*model.Game {
 	var player1Name, player2Name string
 	var size int
+	var gameCount int
 
-	fmt.Print("Введите размер доски: ")
-	fmt.Scan(&size)
-	if size <= 0 {
-		fmt.Println("Ошибка: размер доски должен быть больше 0")
+	fmt.Print("Введите количество досок: ")
+	fmt.Scan(&gameCount)
+	if gameCount <= 0 {
+		fmt.Println("Ошибка: количество досок должно быть больше 0")
 		return nil
 	}
-	fmt.Print("Введите имя игрока 1: ")
-	fmt.Scan(&player1Name)
-	fmt.Print("Введите имя игрока 2: ")
-	fmt.Scan(&player2Name)
 
-	game := model.NewGame(player1Name, player2Name, size)
-	return game
+	games := make([]*model.Game, 0, gameCount)
+	for i := 0; i < gameCount; i++ {
+		fmt.Printf("Доска %d\n", i+1)
+		fmt.Print("Введите размер доски: ")
+		fmt.Scan(&size)
+		if size <= 0 {
+			fmt.Println("Ошибка: размер доски должен быть больше 0")
+			return nil
+		}
+		fmt.Print("Введите имя игрока 1: ")
+		fmt.Scan(&player1Name)
+		fmt.Print("Введите имя игрока 2: ")
+		fmt.Scan(&player2Name)
+
+		game := model.NewGame(player1Name, player2Name, size)
+		games = append(games, game)
+	}
+
+	return games
 }
 
 func placePieces(board *model.Board, size int) {
@@ -130,10 +225,20 @@ func makeColumnHeader(size, rowNumberWidth int) string {
 	return columnHeader
 }
 
-func displayBoard(game *model.Game) {
+func displayBoard(game *model.Game, index int) {
+	game.Mu.RLock()
+	defer game.Mu.RUnlock()
 	board := game.Board
 	size := board.Size
 	rowNumberWidth := len(fmt.Sprintf("%d", size))
+
+	fmt.Printf("\nИгра #%d\n", index)
+	fmt.Printf("Время хода: %s %v | %s %v\n",
+		game.WhitePlayer.GetDisplayName(),
+		game.LastWhiteTime,
+		game.BlackPlayer.GetDisplayName(),
+		game.LastBlackTime,
+	)
 
 	// Print column header
 	fmt.Print(makeColumnHeader(size, rowNumberWidth))
@@ -177,6 +282,7 @@ func gameLoop(game *model.Game) {
 		fmt.Printf("\n%s, ваш ход (формат: e2-e4 или 'exit' для выхода или 'Автоход' или 'Сдался'): ", game.CurrentPlayer.GetDisplayName())
 
 		var input string
+		startTime := time.Now()
 		fmt.Scan(&input)
 
 		// 1. exit / quit
@@ -208,36 +314,47 @@ func gameLoop(game *model.Game) {
 				if !game.IsInProgress() {
 					break
 				}
-				if err := autoMove(game); err != nil {
+				duration, notation, mover, err := autoMove(game)
+				if err != nil {
 					fmt.Printf("Ошибка автохода: %v\n", err)
 					break
 				}
+				recordMoveTime(game, mover, duration)
+				fmt.Println(notation)
+				displayBoard(game, 1)
 			}
 			continue
 		}
 
 		// 4. Обычный ход
+		game.Mu.Lock()
 		move, err := parseMove(input, game.CurrentPlayer, game.Board)
 		if err != nil {
 			fmt.Printf("Ошибка: %v\n", err)
+			game.Mu.Unlock()
 			continue
 		}
 
 		if !move.IsValid(game.Board) {
 			fmt.Println("Ошибка: неверные координаты хода")
+			game.Mu.Unlock()
 			continue
 		}
 
 		if err := applyMove(game.Board, move); err != nil {
 			fmt.Printf("Ошибка: %v\n", err)
+			game.Mu.Unlock()
 			continue
 		}
 
 		// Add move to game history and switch player
 		game.MakeMove(move)
+		duration := time.Since(startTime)
+		setMoveTimeUnsafe(game, move.Player, duration)
+		game.Mu.Unlock()
 
 		fmt.Println()
-		displayBoard(game)
+		displayBoard(game, 1)
 	}
 }
 
@@ -248,12 +365,14 @@ func isPlayerPiece(piece string, player *model.Player) bool {
 	return piece == "♚" || piece == "♛" || piece == "♜" || piece == "♝" || piece == "♞" || piece == "♟"
 }
 
-func autoMove(game *model.Game) error {
+func autoMove(game *model.Game) (time.Duration, string, *model.Player, error) {
+	startTime := time.Now()
 	// Random delay 2-4 seconds
 	delay := time.Duration(2+rand.Intn(3)) * time.Second
-	fmt.Printf("Думаю... (%v)\n", delay)
 	time.Sleep(delay)
 
+	game.Mu.Lock()
+	defer game.Mu.Unlock()
 	board := game.Board
 	player := game.CurrentPlayer
 
@@ -293,13 +412,13 @@ func autoMove(game *model.Game) error {
 			fromRow := board.Size - row
 			toCol := string(rune('a' + col))
 			toRow := board.Size - targetRow
-			fmt.Printf("Автоход: %s%d-%s%d\n", fromCol, fromRow, toCol, toRow)
-			displayBoard(game)
-			return nil
+			duration := time.Since(startTime)
+			notation := fmt.Sprintf("Автоход: %s%d-%s%d", fromCol, fromRow, toCol, toRow)
+			return duration, notation, player, nil
 		}
 	}
 
-	return fmt.Errorf("нет доступных ходов для %s", player.GetDisplayName())
+	return 0, "", player, fmt.Errorf("нет доступных ходов для %s", player.GetDisplayName())
 }
 
 func parseMove(input string, player *model.Player, board *model.Board) (*model.Move, error) {
@@ -348,4 +467,112 @@ func convertColumnToIndex(col byte) int {
 		return int(col - 'A')
 	}
 	return -1
+}
+
+func recordMoveTime(game *model.Game, player *model.Player, duration time.Duration) {
+	if game == nil || player == nil {
+		return
+	}
+	game.Mu.Lock()
+	defer game.Mu.Unlock()
+	setMoveTimeUnsafe(game, player, duration)
+}
+
+func setMoveTimeUnsafe(game *model.Game, player *model.Player, duration time.Duration) {
+	game.LastMoveTime = duration
+	if player.IsWhite() {
+		game.LastWhiteTime = duration
+		return
+	}
+	game.LastBlackTime = duration
+}
+
+func displayAllBoards(games []*model.Game) {
+	for i, game := range games {
+		displayBoard(game, i+1)
+	}
+}
+
+func gameSimulator(manager *GameManager, updateCh chan<- []*model.Game, done <-chan struct{}) {
+	var wg sync.WaitGroup
+	for _, game := range manager.GetGames() {
+		wg.Add(1)
+		go func(g *model.Game) {
+			defer wg.Done()
+			simulateGame(g, manager, updateCh, done)
+		}(game)
+	}
+	wg.Wait()
+}
+
+func simulateGame(game *model.Game, manager *GameManager, updateCh chan<- []*model.Game, done <-chan struct{}) {
+	for {
+		select {
+		case <-done:
+			return
+		default:
+		}
+
+		game.Mu.RLock()
+		inProgress := game.IsInProgress()
+		game.Mu.RUnlock()
+		if !inProgress {
+			manager.RemoveFinishedGames()
+			return
+		}
+
+		duration, _, mover, err := autoMove(game)
+		if err != nil {
+			game.Mu.Lock()
+			game.Finish()
+			game.Mu.Unlock()
+			manager.RemoveFinishedGames()
+			return
+		}
+		recordMoveTime(game, mover, duration)
+		sendGameSnapshot(manager, updateCh)
+	}
+}
+
+func sendGameSnapshot(manager *GameManager, updateCh chan<- []*model.Game) {
+	select {
+	case updateCh <- manager.GetGames():
+	default:
+	}
+}
+
+func boardRenderer(manager *GameManager, updateCh <-chan []*model.Game, done <-chan struct{}) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	var snapshot []*model.Game
+	for {
+		select {
+		case <-done:
+			return
+		case update := <-updateCh:
+			snapshot = update
+		case <-ticker.C:
+			if snapshot == nil {
+				snapshot = manager.GetGames()
+			}
+			displayAllBoards(snapshot)
+		}
+	}
+}
+
+func sliceLogger(done <-chan struct{}) {
+	for {
+		select {
+		case <-done:
+			return
+		case change := <-repository.SliceChangeChan:
+			fmt.Printf("[SLICE] %s %s at %s (%s)\n",
+				change.SliceType,
+				change.Operation,
+				change.Timestamp.Format(time.RFC3339),
+				change.Details,
+			)
+		}
+	}
 }
