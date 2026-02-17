@@ -9,7 +9,6 @@ import (
 
 	"github.com/imyakin/go_hw/internal/model"
 	"github.com/imyakin/go_hw/internal/repository"
-	"github.com/imyakin/go_hw/internal/service"
 )
 
 var whitePieces = map[string]string{
@@ -45,6 +44,7 @@ func (m *GameManager) AddGame(game *model.Game) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.games = append(m.games, game)
+	repository.LogSliceChange("games", "add", fmt.Sprintf("added game %p", game))
 }
 
 func (m *GameManager) GetGames() []*model.Game {
@@ -98,20 +98,6 @@ func main() {
 		repository.Store(game.BlackPlayer)
 	}
 
-	// Start entity generation ticker
-	ticker := time.NewTicker(1 * time.Second)
-	done := make(chan bool)
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case <-ticker.C:
-				service.GenerateEntities(repository.Store)
-			}
-		}
-	}()
-
 	// Slice change logger
 	logDone := make(chan struct{})
 	go sliceLogger(logDone)
@@ -136,9 +122,7 @@ func main() {
 		close(renderDone)
 	}
 
-	// Stop ticker and print stats
-	ticker.Stop()
-	done <- true
+	// Print stats
 	close(logDone)
 	repository.PrintStats()
 }

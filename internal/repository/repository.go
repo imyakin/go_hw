@@ -36,7 +36,6 @@ func Store(entity model.GameEntity) {
 		muGames.Lock()
 		games = append(games, e)
 		muGames.Unlock()
-		notifySliceChange("games", "add", fmt.Sprintf("added game %p", e))
 	case *model.Move:
 		muMoves.Lock()
 		moves = append(moves, e)
@@ -102,6 +101,10 @@ func notifySliceChange(sliceType, operation, details string) {
 	}:
 	default:
 	}
+}
+
+func LogSliceChange(sliceType, operation, details string) {
+	notifySliceChange(sliceType, operation, details)
 }
 
 func PrintStats() {
