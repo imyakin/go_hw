@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"math/rand"
+	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/imyakin/go_hw/internal/model"
@@ -82,6 +87,9 @@ func (m *GameManager) GetGameCount() int {
 }
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	games := startGames()
 	if len(games) == 0 {
 		return
@@ -98,33 +106,47 @@ func main() {
 		repository.Store(game.BlackPlayer)
 	}
 
-	// Slice change logger
-	logDone := make(chan struct{})
-	go sliceLogger(logDone)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		sliceLogger(ctx)
+	}()
 
 	if manager.GetGameCount() == 1 {
 		game := manager.GetGames()[0]
 		displayBoard(game, 1)
-		gameLoop(game)
+		gameLoop(ctx, game)
 	} else {
 		updateCh := make(chan []*model.Game, 16)
-		renderDone := make(chan struct{})
-		simDone := make(chan struct{})
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			gameSimulator(ctx, manager, updateCh)
+		}()
+		go func() {
+			defer wg.Done()
+			boardRenderer(ctx, manager, updateCh)
+		}()
 
-		go gameSimulator(manager, updateCh, simDone)
-		go boardRenderer(manager, updateCh, renderDone)
-
-		// Wait until all games are finished
 		for manager.GetGameCount() > 0 {
-			time.Sleep(200 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				goto waitWorkers
+			default:
+				time.Sleep(200 * time.Millisecond)
+			}
 		}
-		close(simDone)
-		close(renderDone)
+	waitWorkers:
 	}
 
-	// Print stats
-	close(logDone)
-	repository.PrintStats()
+	exitedBySignal := (ctx.Err() != nil)
+	stop()
+	wg.Wait()
+
+	if !exitedBySignal {
+		repository.PrintStats()
+	}
 }
 
 func startGames() []*model.Game {
@@ -261,13 +283,31 @@ func displayBoard(game *model.Game, index int) {
 	}
 }
 
-func gameLoop(game *model.Game) {
+func gameLoop(ctx context.Context, game *model.Game) {
+	inputCh := make(chan string, 1)
+	go func() {
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			inputCh <- scanner.Text()
+		}
+		close(inputCh)
+	}()
+
 	for game.IsInProgress() {
 		fmt.Printf("\n%s, ваш ход (формат: e2-e4 или 'exit' для выхода или 'Автоход' или 'Сдался'): ", game.CurrentPlayer.GetDisplayName())
 
 		var input string
+		select {
+		case <-ctx.Done():
+			return
+		case line, ok := <-inputCh:
+			if !ok {
+				return
+			}
+			input = line
+		}
+
 		startTime := time.Now()
-		fmt.Scan(&input)
 
 		// 1. exit / quit
 		if input == "exit" || input == "quit" {
@@ -289,17 +329,32 @@ func gameLoop(game *model.Game) {
 		if strings.EqualFold(input, "Автоход") {
 			fmt.Print("Сколько автоходов сделать: ")
 			var count int
-			_, err := fmt.Scan(&count)
-			if err != nil || count <= 0 {
-				fmt.Println("Ошибка: введите положительное число")
-				continue
+			select {
+			case <-ctx.Done():
+				return
+			case line, ok := <-inputCh:
+				if !ok {
+					return
+				}
+				if _, err := fmt.Sscanf(line, "%d", &count); err != nil || count <= 0 {
+					fmt.Println("Ошибка: введите положительное число")
+					continue
+				}
 			}
 			for i := 0; i < count; i++ {
 				if !game.IsInProgress() {
 					break
 				}
-				duration, notation, mover, err := autoMove(game)
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+				duration, notation, mover, err := autoMove(ctx, game)
 				if err != nil {
+					if ctx.Err() != nil {
+						return
+					}
 					fmt.Printf("Ошибка автохода: %v\n", err)
 					break
 				}
@@ -349,11 +404,16 @@ func isPlayerPiece(piece string, player *model.Player) bool {
 	return piece == "♚" || piece == "♛" || piece == "♜" || piece == "♝" || piece == "♞" || piece == "♟"
 }
 
-func autoMove(game *model.Game) (time.Duration, string, *model.Player, error) {
+func autoMove(ctx context.Context, game *model.Game) (time.Duration, string, *model.Player, error) {
 	startTime := time.Now()
-	// Random delay 2-4 seconds
 	delay := time.Duration(2+rand.Intn(3)) * time.Second
-	time.Sleep(delay)
+	timer := time.NewTimer(delay)
+	select {
+	case <-ctx.Done():
+		timer.Stop()
+		return 0, "", nil, ctx.Err()
+	case <-timer.C:
+	}
 
 	game.Mu.Lock()
 	defer game.Mu.Unlock()
@@ -477,22 +537,22 @@ func displayAllBoards(games []*model.Game) {
 	}
 }
 
-func gameSimulator(manager *GameManager, updateCh chan<- []*model.Game, done <-chan struct{}) {
+func gameSimulator(ctx context.Context, manager *GameManager, updateCh chan<- []*model.Game) {
 	var wg sync.WaitGroup
 	for _, game := range manager.GetGames() {
 		wg.Add(1)
 		go func(g *model.Game) {
 			defer wg.Done()
-			simulateGame(g, manager, updateCh, done)
+			simulateGame(ctx, g, manager, updateCh)
 		}(game)
 	}
 	wg.Wait()
 }
 
-func simulateGame(game *model.Game, manager *GameManager, updateCh chan<- []*model.Game, done <-chan struct{}) {
+func simulateGame(ctx context.Context, game *model.Game, manager *GameManager, updateCh chan<- []*model.Game) {
 	for {
 		select {
-		case <-done:
+		case <-ctx.Done():
 			return
 		default:
 		}
@@ -505,8 +565,11 @@ func simulateGame(game *model.Game, manager *GameManager, updateCh chan<- []*mod
 			return
 		}
 
-		duration, _, mover, err := autoMove(game)
+		duration, _, mover, err := autoMove(ctx, game)
 		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
 			game.Mu.Lock()
 			game.Finish()
 			game.Mu.Unlock()
@@ -525,14 +588,14 @@ func sendGameSnapshot(manager *GameManager, updateCh chan<- []*model.Game) {
 	}
 }
 
-func boardRenderer(manager *GameManager, updateCh <-chan []*model.Game, done <-chan struct{}) {
+func boardRenderer(ctx context.Context, manager *GameManager, updateCh <-chan []*model.Game) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	var snapshot []*model.Game
 	for {
 		select {
-		case <-done:
+		case <-ctx.Done():
 			return
 		case update := <-updateCh:
 			snapshot = update
@@ -545,10 +608,10 @@ func boardRenderer(manager *GameManager, updateCh <-chan []*model.Game, done <-c
 	}
 }
 
-func sliceLogger(done <-chan struct{}) {
+func sliceLogger(ctx context.Context) {
 	for {
 		select {
-		case <-done:
+		case <-ctx.Done():
 			return
 		case change := <-repository.SliceChangeChan:
 			fmt.Printf("[SLICE] %s %s at %s (%s)\n",
