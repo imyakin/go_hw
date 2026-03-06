@@ -31,19 +31,27 @@ func Store(entity model.GameEntity) {
 	case *model.Board:
 		muBoards.Lock()
 		boards = append(boards, e)
+		saveBoardsCSV()
 		muBoards.Unlock()
+		notifySliceChange("boards", "add", fmt.Sprintf("added board %p, saved to CSV", e))
 	case *model.Game:
 		muGames.Lock()
 		games = append(games, e)
+		saveGamesCSV()
 		muGames.Unlock()
+		notifySliceChange("games", "add", fmt.Sprintf("added game %p, saved to CSV", e))
 	case *model.Move:
 		muMoves.Lock()
 		moves = append(moves, e)
+		saveMovesCSV()
 		muMoves.Unlock()
+		notifySliceChange("moves", "add", fmt.Sprintf("added move %s, saved to CSV", e.GetNotation()))
 	case *model.Player:
 		muPlayers.Lock()
 		players = append(players, e)
+		savePlayersCSV()
 		muPlayers.Unlock()
+		notifySliceChange("players", "add", fmt.Sprintf("added player %s, saved to CSV", e.Name))
 	}
 }
 
@@ -53,7 +61,8 @@ func RemoveGame(game *model.Game) {
 	for i, g := range games {
 		if g == game {
 			games = append(games[:i], games[i+1:]...)
-			notifySliceChange("games", "remove", fmt.Sprintf("removed game %p", game))
+			saveGamesCSV()
+			notifySliceChange("games", "remove", fmt.Sprintf("removed game %p, saved to CSV", game))
 			return
 		}
 	}

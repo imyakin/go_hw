@@ -90,6 +90,13 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	if err := repository.LoadAll(); err != nil {
+		fmt.Printf("Предупреждение: ошибка загрузки данных из CSV: %v\n", err)
+	} else {
+		fmt.Println("Данные из предыдущих сессий загружены из CSV файлов.")
+		repository.PrintStats()
+	}
+
 	games := startGames()
 	if len(games) == 0 {
 		return
@@ -391,6 +398,7 @@ func gameLoop(ctx context.Context, game *model.Game) {
 		duration := time.Since(startTime)
 		setMoveTimeUnsafe(game, move.Player, duration)
 		game.Mu.Unlock()
+		repository.Store(move)
 
 		fmt.Println()
 		displayBoard(game, 1)
@@ -450,8 +458,8 @@ func autoMove(ctx context.Context, game *model.Game) (time.Duration, string, *mo
 				continue
 			}
 			game.MakeMove(move)
+			repository.Store(move)
 
-			// Format move notation
 			fromCol := string(rune('a' + col))
 			fromRow := board.Size - row
 			toCol := string(rune('a' + col))
