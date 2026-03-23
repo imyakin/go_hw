@@ -14,6 +14,7 @@ const (
 )
 
 type Game struct {
+	ID            int
 	WhitePlayer   *Player
 	BlackPlayer   *Player
 	Board         *Board

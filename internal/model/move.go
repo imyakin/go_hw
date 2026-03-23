@@ -6,6 +6,8 @@ type Position struct {
 }
 
 type Move struct {
+	ID     int
+	GameID int
 	From   Position
 	To     Position
 	Player *Player
