@@ -1,6 +1,7 @@
 package model
 
 type Board struct {
+	ID    int
 	Size  int
 	Cells [][]string
 }
