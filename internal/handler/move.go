@@ -60,6 +60,18 @@ func moveToResponse(m *model.Move) MoveResponse {
 	}
 }
 
+// CreateMove creates a new move in a game
+// @Summary Create a new move
+// @Description Makes a move in an active chess game. Use either notation (e.g. "e2-e4") or row/col coordinates.
+// @Tags moves
+// @Accept json
+// @Produce json
+// @Param input body CreateMoveRequest true "Move parameters"
+// @Success 201 {object} MoveResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 422 {object} ErrorResponse
+// @Router /api/moves [post]
 func CreateMove(c *gin.Context) {
 	var req CreateMoveRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -126,6 +138,15 @@ func CreateMove(c *gin.Context) {
 	c.JSON(http.StatusCreated, moveToResponse(move))
 }
 
+// ListMoves returns all moves, optionally filtered by game_id
+// @Summary List all moves
+// @Description Returns a list of all moves. Can be filtered by game_id query parameter.
+// @Tags moves
+// @Produce json
+// @Param game_id query int false "Filter by game ID"
+// @Success 200 {array} MoveResponse
+// @Failure 400 {object} ErrorResponse
+// @Router /api/moves [get]
 func ListMoves(c *gin.Context) {
 	allMoves := repository.GetMoves()
 
@@ -154,6 +175,16 @@ func ListMoves(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// GetMove returns a move by ID
+// @Summary Get a move by ID
+// @Description Returns a single move by its ID
+// @Tags moves
+// @Produce json
+// @Param id path int true "Move ID"
+// @Success 200 {object} MoveResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/moves/{id} [get]
 func GetMove(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -170,6 +201,18 @@ func GetMove(c *gin.Context) {
 	c.JSON(http.StatusOK, moveToResponse(move))
 }
 
+// UpdateMove updates an existing move
+// @Summary Update a move
+// @Description Updates an existing move by ID
+// @Tags moves
+// @Accept json
+// @Produce json
+// @Param id path int true "Move ID"
+// @Param input body UpdateMoveRequest true "Move update parameters"
+// @Success 200 {object} MoveResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/moves/{id} [put]
 func UpdateMove(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

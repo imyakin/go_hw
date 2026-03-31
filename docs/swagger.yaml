@@ -1,0 +1,626 @@
+definitions:
+  handler.BoardResponse:
+    properties:
+      cells:
+        items:
+          items:
+            type: string
+          type: array
+        type: array
+      id:
+        type: integer
+      size:
+        type: integer
+    type: object
+  handler.CreateBoardRequest:
+    properties:
+      size:
+        minimum: 1
+        type: integer
+    required:
+    - size
+    type: object
+  handler.CreateGameRequest:
+    properties:
+      black_player_name:
+        type: string
+      board_size:
+        minimum: 1
+        type: integer
+      white_player_name:
+        type: string
+    required:
+    - black_player_name
+    - board_size
+    - white_player_name
+    type: object
+  handler.CreateMoveRequest:
+    properties:
+      from_col:
+        type: integer
+      from_row:
+        type: integer
+      game_id:
+        type: integer
+      notation:
+        description: 'Alternative: chess notation like "e2-e4"'
+        type: string
+      to_col:
+        type: integer
+      to_row:
+        type: integer
+    required:
+    - game_id
+    type: object
+  handler.CreatePlayerRequest:
+    properties:
+      color:
+        enum:
+        - white
+        - black
+        type: string
+      name:
+        type: string
+    required:
+    - color
+    - name
+    type: object
+  handler.ErrorResponse:
+    properties:
+      error:
+        example: error message
+        type: string
+    type: object
+  handler.GameResponse:
+    properties:
+      black_player_name:
+        type: string
+      board_size:
+        type: integer
+      cells:
+        items:
+          items:
+            type: string
+          type: array
+        type: array
+      current_player_color:
+        type: string
+      id:
+        type: integer
+      status:
+        type: string
+      white_player_name:
+        type: string
+      winner_color:
+        type: string
+    type: object
+  handler.MoveResponse:
+    properties:
+      from_col:
+        type: integer
+      from_row:
+        type: integer
+      game_id:
+        type: integer
+      id:
+        type: integer
+      notation:
+        type: string
+      piece:
+        type: string
+      player:
+        type: string
+      to_col:
+        type: integer
+      to_row:
+        type: integer
+    type: object
+  handler.PlayerResponse:
+    properties:
+      color:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      symbol:
+        type: string
+    type: object
+  handler.UpdateBoardRequest:
+    properties:
+      cells:
+        items:
+          items:
+            type: string
+          type: array
+        type: array
+      size:
+        minimum: 1
+        type: integer
+    required:
+    - cells
+    - size
+    type: object
+  handler.UpdateGameRequest:
+    properties:
+      black_player_name:
+        type: string
+      board_size:
+        minimum: 1
+        type: integer
+      status:
+        type: string
+      white_player_name:
+        type: string
+    required:
+    - black_player_name
+    - board_size
+    - status
+    - white_player_name
+    type: object
+  handler.UpdateMoveRequest:
+    properties:
+      from_col:
+        type: integer
+      from_row:
+        type: integer
+      game_id:
+        type: integer
+      piece:
+        type: string
+      to_col:
+        type: integer
+      to_row:
+        type: integer
+    required:
+    - from_col
+    - from_row
+    - game_id
+    - piece
+    - to_col
+    - to_row
+    type: object
+  handler.UpdatePlayerRequest:
+    properties:
+      color:
+        enum:
+        - white
+        - black
+        type: string
+      name:
+        type: string
+    required:
+    - color
+    - name
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API server for managing chess games, boards, players and moves
+  title: Chess Game API
+  version: "1.0"
+paths:
+  /api/boards:
+    get:
+      description: Returns a list of all chess boards
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.BoardResponse'
+            type: array
+      summary: List all boards
+      tags:
+      - boards
+    post:
+      consumes:
+      - application/json
+      description: Creates a new chess board with given size
+      parameters:
+      - description: Board creation parameters
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateBoardRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.BoardResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Create a new board
+      tags:
+      - boards
+  /api/boards/{id}:
+    get:
+      description: Returns a single chess board by its ID
+      parameters:
+      - description: Board ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.BoardResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Get a board by ID
+      tags:
+      - boards
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing chess board by ID
+      parameters:
+      - description: Board ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Board update parameters
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateBoardRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.BoardResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Update a board
+      tags:
+      - boards
+  /api/games:
+    get:
+      description: Returns a list of all chess games
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.GameResponse'
+            type: array
+      summary: List all games
+      tags:
+      - games
+    post:
+      consumes:
+      - application/json
+      description: Creates a new chess game with two players and a board of given
+        size
+      parameters:
+      - description: Game creation parameters
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateGameRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.GameResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Create a new game
+      tags:
+      - games
+  /api/games/{id}:
+    get:
+      description: Returns a single chess game by its ID
+      parameters:
+      - description: Game ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.GameResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Get a game by ID
+      tags:
+      - games
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing chess game by ID
+      parameters:
+      - description: Game ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Game update parameters
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateGameRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.GameResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Update a game
+      tags:
+      - games
+  /api/moves:
+    get:
+      description: Returns a list of all moves. Can be filtered by game_id query parameter.
+      parameters:
+      - description: Filter by game ID
+        in: query
+        name: game_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.MoveResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: List all moves
+      tags:
+      - moves
+    post:
+      consumes:
+      - application/json
+      description: Makes a move in an active chess game. Use either notation (e.g.
+        "e2-e4") or row/col coordinates.
+      parameters:
+      - description: Move parameters
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateMoveRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.MoveResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Create a new move
+      tags:
+      - moves
+  /api/moves/{id}:
+    get:
+      description: Returns a single move by its ID
+      parameters:
+      - description: Move ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.MoveResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Get a move by ID
+      tags:
+      - moves
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing move by ID
+      parameters:
+      - description: Move ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Move update parameters
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateMoveRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.MoveResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Update a move
+      tags:
+      - moves
+  /api/players:
+    get:
+      description: Returns a list of all chess players
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.PlayerResponse'
+            type: array
+      summary: List all players
+      tags:
+      - players
+    post:
+      consumes:
+      - application/json
+      description: Creates a new chess player with name and color
+      parameters:
+      - description: Player creation parameters
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreatePlayerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.PlayerResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Create a new player
+      tags:
+      - players
+  /api/players/{id}:
+    get:
+      description: Returns a single chess player by its ID
+      parameters:
+      - description: Player ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PlayerResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Get a player by ID
+      tags:
+      - players
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing chess player by ID
+      parameters:
+      - description: Player ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Player update parameters
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdatePlayerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PlayerResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Update a player
+      tags:
+      - players
+swagger: "2.0"

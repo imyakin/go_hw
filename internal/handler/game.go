@@ -10,6 +10,11 @@ import (
 	"github.com/imyakin/go_hw/internal/repository"
 )
 
+// ErrorResponse represents an error response
+type ErrorResponse struct {
+	Error string `json:"error" example:"error message"`
+}
+
 type CreateGameRequest struct {
 	WhitePlayerName string `json:"white_player_name" binding:"required"`
 	BlackPlayerName string `json:"black_player_name" binding:"required"`
@@ -59,6 +64,16 @@ func gameToResponse(g *model.Game) GameResponse {
 	}
 }
 
+// CreateGame creates a new chess game
+// @Summary Create a new game
+// @Description Creates a new chess game with two players and a board of given size
+// @Tags games
+// @Accept json
+// @Produce json
+// @Param input body CreateGameRequest true "Game creation parameters"
+// @Success 201 {object} GameResponse
+// @Failure 400 {object} ErrorResponse
+// @Router /api/games [post]
 func CreateGame(c *gin.Context) {
 	var req CreateGameRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -78,6 +93,13 @@ func CreateGame(c *gin.Context) {
 	c.JSON(http.StatusCreated, gameToResponse(game))
 }
 
+// ListGames returns all games
+// @Summary List all games
+// @Description Returns a list of all chess games
+// @Tags games
+// @Produce json
+// @Success 200 {array} GameResponse
+// @Router /api/games [get]
 func ListGames(c *gin.Context) {
 	games := repository.GetGames()
 	result := make([]GameResponse, 0, len(games))
@@ -87,6 +109,16 @@ func ListGames(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// GetGame returns a game by ID
+// @Summary Get a game by ID
+// @Description Returns a single chess game by its ID
+// @Tags games
+// @Produce json
+// @Param id path int true "Game ID"
+// @Success 200 {object} GameResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/games/{id} [get]
 func GetGame(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -103,6 +135,18 @@ func GetGame(c *gin.Context) {
 	c.JSON(http.StatusOK, gameToResponse(game))
 }
 
+// UpdateGame updates an existing game
+// @Summary Update a game
+// @Description Updates an existing chess game by ID
+// @Tags games
+// @Accept json
+// @Produce json
+// @Param id path int true "Game ID"
+// @Param input body UpdateGameRequest true "Game update parameters"
+// @Success 200 {object} GameResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/games/{id} [put]
 func UpdateGame(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

@@ -13,6 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/imyakin/go_hw/internal/handler"
 	"github.com/imyakin/go_hw/internal/repository"
+
+	_ "github.com/imyakin/go_hw/docs"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 const boardPageTemplate = `<!DOCTYPE html>
@@ -99,6 +103,12 @@ type cellData struct {
 	Class string
 }
 
+// @title Chess Game API
+// @version 1.0
+// @description REST API server for managing chess games, boards, players and moves
+
+// @host localhost:8080
+
 func main() {
 	if err := repository.LoadAll(); err != nil {
 		fmt.Printf("Предупреждение: ошибка загрузки данных из CSV: %v\n", err)
@@ -159,6 +169,10 @@ func main() {
 		c.Header("Content-Type", "text/html; charset=utf-8")
 		tmpl.Execute(c.Writer, data)
 	})
+
+	// Swagger UI
+	url := ginSwagger.URL("http://localhost:8080/swagger/doc.json")
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
 
 	// JSON API
 	api := r.Group("/api")
