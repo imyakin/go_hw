@@ -29,11 +29,11 @@ func savePlayersCSV() error {
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	if err := w.Write([]string{"Name", "Color", "Symbol"}); err != nil {
+	if err := w.Write([]string{"ID", "Name", "Color", "Symbol"}); err != nil {
 		return err
 	}
 	for _, p := range players {
-		if err := w.Write([]string{p.Name, string(p.Color), p.Symbol}); err != nil {
+		if err := w.Write([]string{strconv.Itoa(p.ID), p.Name, string(p.Color), p.Symbol}); err != nil {
 			return err
 		}
 	}
@@ -58,18 +58,18 @@ func loadPlayers() ([]*model.Player, error) {
 
 	var result []*model.Player
 	for i, rec := range records {
-		// i == 0 — это строка заголовка (Name, Color, Symbol), её пропускаем.
-		// Также пропускаем строки, в которых меньше 3 полей, чтобы не обращаться к несуществующим индексам.
 		if i == 0 {
 			continue
 		}
-		if len(rec) < 3 {
+		if len(rec) < 4 {
 			continue
 		}
+		id, _ := strconv.Atoi(rec[0])
 		result = append(result, &model.Player{
-			Name:   rec[0],
-			Color:  model.PlayerColor(rec[1]),
-			Symbol: rec[2],
+			ID:     id,
+			Name:   rec[1],
+			Color:  model.PlayerColor(rec[2]),
+			Symbol: rec[3],
 		})
 	}
 	return result, nil
@@ -86,7 +86,7 @@ func saveBoardsCSV() error {
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	if err := w.Write([]string{"Size", "Cells"}); err != nil {
+	if err := w.Write([]string{"ID", "Size", "Cells"}); err != nil {
 		return err
 	}
 	for _, b := range boards {
@@ -94,7 +94,7 @@ func saveBoardsCSV() error {
 		if err != nil {
 			return fmt.Errorf("marshal board cells: %w", err)
 		}
-		if err := w.Write([]string{strconv.Itoa(b.Size), string(cellsJSON)}); err != nil {
+		if err := w.Write([]string{strconv.Itoa(b.ID), strconv.Itoa(b.Size), string(cellsJSON)}); err != nil {
 			return err
 		}
 	}
@@ -119,23 +119,23 @@ func loadBoards() ([]*model.Board, error) {
 
 	var result []*model.Board
 	for i, rec := range records {
-		// i == 0 — строка заголовка (Size, Cells), её пропускаем.
-		// Также пропускаем строки, в которых меньше 2 полей.
 		if i == 0 {
 			continue
 		}
-		if len(rec) < 2 {
+		if len(rec) < 3 {
 			continue
 		}
-		size, err := strconv.Atoi(rec[0])
+		id, _ := strconv.Atoi(rec[0])
+		size, err := strconv.Atoi(rec[1])
 		if err != nil {
 			continue
 		}
 		var cells [][]string
-		if err := json.Unmarshal([]byte(rec[1]), &cells); err != nil {
+		if err := json.Unmarshal([]byte(rec[2]), &cells); err != nil {
 			continue
 		}
 		result = append(result, &model.Board{
+			ID:    id,
 			Size:  size,
 			Cells: cells,
 		})
@@ -154,7 +154,7 @@ func saveMovesCSV() error {
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	if err := w.Write([]string{"FromRow", "FromCol", "ToRow", "ToCol", "PlayerName", "PlayerColor", "Piece"}); err != nil {
+	if err := w.Write([]string{"ID", "GameID", "FromRow", "FromCol", "ToRow", "ToCol", "PlayerName", "PlayerColor", "Piece"}); err != nil {
 		return err
 	}
 	for _, m := range moves {
@@ -164,6 +164,8 @@ func saveMovesCSV() error {
 			playerColor = string(m.Player.Color)
 		}
 		if err := w.Write([]string{
+			strconv.Itoa(m.ID),
+			strconv.Itoa(m.GameID),
 			strconv.Itoa(m.From.Row),
 			strconv.Itoa(m.From.Col),
 			strconv.Itoa(m.To.Row),
@@ -199,24 +201,28 @@ func loadMoves() ([]*model.Move, error) {
 		if i == 0 {
 			continue
 		}
-		if len(rec) < 7 {
+		if len(rec) < 9 {
 			continue
 		}
-		fromRow, _ := strconv.Atoi(rec[0])
-		fromCol, _ := strconv.Atoi(rec[1])
-		toRow, _ := strconv.Atoi(rec[2])
-		toCol, _ := strconv.Atoi(rec[3])
+		id, _ := strconv.Atoi(rec[0])
+		gameID, _ := strconv.Atoi(rec[1])
+		fromRow, _ := strconv.Atoi(rec[2])
+		fromCol, _ := strconv.Atoi(rec[3])
+		toRow, _ := strconv.Atoi(rec[4])
+		toCol, _ := strconv.Atoi(rec[5])
 
 		var player *model.Player
-		if rec[4] != "" {
-			player = model.NewPlayer(rec[4], model.PlayerColor(rec[5]))
+		if rec[6] != "" {
+			player = model.NewPlayer(rec[6], model.PlayerColor(rec[7]))
 		}
 
 		result = append(result, &model.Move{
+			ID:     id,
+			GameID: gameID,
 			From:   model.Position{Row: fromRow, Col: fromCol},
 			To:     model.Position{Row: toRow, Col: toCol},
 			Player: player,
-			Piece:  rec[6],
+			Piece:  rec[8],
 		})
 	}
 	return result, nil
@@ -234,7 +240,7 @@ func saveGamesCSV() error {
 	defer w.Flush()
 
 	if err := w.Write([]string{
-		"WhitePlayerName", "BlackPlayerName", "BoardSize",
+		"ID", "WhitePlayerName", "BlackPlayerName", "BoardSize",
 		"Status", "CurrentPlayerColor", "WinnerColor", "Cells",
 	}); err != nil {
 		return err
@@ -252,6 +258,7 @@ func saveGamesCSV() error {
 		}
 		cellsJSON, _ := json.Marshal(g.Board.Cells)
 		err := w.Write([]string{
+			strconv.Itoa(g.ID),
 			g.WhitePlayer.Name,
 			g.BlackPlayer.Name,
 			strconv.Itoa(g.Board.Size),
@@ -289,36 +296,38 @@ func loadGames() ([]*model.Game, error) {
 		if i == 0 {
 			continue
 		}
-		if len(rec) < 7 {
+		if len(rec) < 8 {
 			continue
 		}
 
-		boardSize, _ := strconv.Atoi(rec[2])
+		id, _ := strconv.Atoi(rec[0])
+		boardSize, _ := strconv.Atoi(rec[3])
 		var cells [][]string
-		json.Unmarshal([]byte(rec[6]), &cells)
+		json.Unmarshal([]byte(rec[7]), &cells)
 
-		whitePlayer := model.NewPlayer(rec[0], model.White)
-		blackPlayer := model.NewPlayer(rec[1], model.Black)
+		whitePlayer := model.NewPlayer(rec[1], model.White)
+		blackPlayer := model.NewPlayer(rec[2], model.Black)
 
 		board := &model.Board{Size: boardSize, Cells: cells}
 
 		game := &model.Game{
+			ID:          id,
 			WhitePlayer: whitePlayer,
 			BlackPlayer: blackPlayer,
 			Board:       board,
 			Moves:       make([]*model.Move, 0),
-			Status:      model.GameStatus(rec[3]),
+			Status:      model.GameStatus(rec[4]),
 		}
 
-		if rec[4] == string(model.Black) {
+		if rec[5] == string(model.Black) {
 			game.CurrentPlayer = blackPlayer
 		} else {
 			game.CurrentPlayer = whitePlayer
 		}
 
-		if rec[5] == string(model.White) {
+		if rec[6] == string(model.White) {
 			game.Winner = whitePlayer
-		} else if rec[5] == string(model.Black) {
+		} else if rec[6] == string(model.Black) {
 			game.Winner = blackPlayer
 		}
 
@@ -399,6 +408,8 @@ func LoadAll() error {
 		muGames.Unlock()
 		notifySliceChange("games", "load", fmt.Sprintf("loaded %d games from CSV", len(loadedGames)))
 	}
+
+	syncCounters()
 
 	return errors.Join(errs...)
 }

@@ -8,6 +8,7 @@ const (
 )
 
 type Player struct {
+	ID     int
 	Name   string
 	Color  PlayerColor
 	Symbol string // King symbol for the player (♔ or ♚)
