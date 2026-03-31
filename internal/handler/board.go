@@ -32,6 +32,16 @@ func boardToResponse(b *model.Board) BoardResponse {
 	}
 }
 
+// CreateBoard creates a new board
+// @Summary Create a new board
+// @Description Creates a new chess board with given size
+// @Tags boards
+// @Accept json
+// @Produce json
+// @Param input body CreateBoardRequest true "Board creation parameters"
+// @Success 201 {object} BoardResponse
+// @Failure 400 {object} ErrorResponse
+// @Router /api/boards [post]
 func CreateBoard(c *gin.Context) {
 	var req CreateBoardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -45,6 +55,13 @@ func CreateBoard(c *gin.Context) {
 	c.JSON(http.StatusCreated, boardToResponse(board))
 }
 
+// ListBoards returns all boards
+// @Summary List all boards
+// @Description Returns a list of all chess boards
+// @Tags boards
+// @Produce json
+// @Success 200 {array} BoardResponse
+// @Router /api/boards [get]
 func ListBoards(c *gin.Context) {
 	boards := repository.GetBoards()
 	result := make([]BoardResponse, 0, len(boards))
@@ -54,6 +71,16 @@ func ListBoards(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// GetBoard returns a board by ID
+// @Summary Get a board by ID
+// @Description Returns a single chess board by its ID
+// @Tags boards
+// @Produce json
+// @Param id path int true "Board ID"
+// @Success 200 {object} BoardResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/boards/{id} [get]
 func GetBoard(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -70,6 +97,18 @@ func GetBoard(c *gin.Context) {
 	c.JSON(http.StatusOK, boardToResponse(board))
 }
 
+// UpdateBoard updates an existing board
+// @Summary Update a board
+// @Description Updates an existing chess board by ID
+// @Tags boards
+// @Accept json
+// @Produce json
+// @Param id path int true "Board ID"
+// @Param input body UpdateBoardRequest true "Board update parameters"
+// @Success 200 {object} BoardResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/boards/{id} [put]
 func UpdateBoard(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

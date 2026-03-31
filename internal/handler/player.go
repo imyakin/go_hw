@@ -35,6 +35,16 @@ func playerToResponse(p *model.Player) PlayerResponse {
 	}
 }
 
+// CreatePlayer creates a new player
+// @Summary Create a new player
+// @Description Creates a new chess player with name and color
+// @Tags players
+// @Accept json
+// @Produce json
+// @Param input body CreatePlayerRequest true "Player creation parameters"
+// @Success 201 {object} PlayerResponse
+// @Failure 400 {object} ErrorResponse
+// @Router /api/players [post]
 func CreatePlayer(c *gin.Context) {
 	var req CreatePlayerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -48,6 +58,13 @@ func CreatePlayer(c *gin.Context) {
 	c.JSON(http.StatusCreated, playerToResponse(player))
 }
 
+// ListPlayers returns all players
+// @Summary List all players
+// @Description Returns a list of all chess players
+// @Tags players
+// @Produce json
+// @Success 200 {array} PlayerResponse
+// @Router /api/players [get]
 func ListPlayers(c *gin.Context) {
 	players := repository.GetPlayers()
 	result := make([]PlayerResponse, 0, len(players))
@@ -57,6 +74,16 @@ func ListPlayers(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// GetPlayer returns a player by ID
+// @Summary Get a player by ID
+// @Description Returns a single chess player by its ID
+// @Tags players
+// @Produce json
+// @Param id path int true "Player ID"
+// @Success 200 {object} PlayerResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/players/{id} [get]
 func GetPlayer(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -73,6 +100,18 @@ func GetPlayer(c *gin.Context) {
 	c.JSON(http.StatusOK, playerToResponse(player))
 }
 
+// UpdatePlayer updates an existing player
+// @Summary Update a player
+// @Description Updates an existing chess player by ID
+// @Tags players
+// @Accept json
+// @Produce json
+// @Param id path int true "Player ID"
+// @Param input body UpdatePlayerRequest true "Player update parameters"
+// @Success 200 {object} PlayerResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/players/{id} [put]
 func UpdatePlayer(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
