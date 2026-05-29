@@ -1,0 +1,188 @@
+syntax = "proto3";
+
+package chess.v1;
+
+option go_package = "github.com/imyakin/go_hw/gen/chess/v1;chessv1";
+
+message Empty {}
+
+message GetByIdRequest {
+  int32 id = 1;
+}
+
+message DeleteByIdRequest {
+  int32 id = 1;
+}
+
+message ListRequest {}
+
+enum PlayerColor {
+  PLAYER_COLOR_UNSPECIFIED = 0;
+  PLAYER_COLOR_WHITE = 1;
+  PLAYER_COLOR_BLACK = 2;
+}
+
+enum GameStatus {
+  GAME_STATUS_UNSPECIFIED = 0;
+  GAME_STATUS_NOT_STARTED = 1;
+  GAME_STATUS_IN_PROGRESS = 2;
+  GAME_STATUS_FINISHED = 3;
+}
+
+message Row {
+  repeated string cells = 1;
+}
+
+/* ========== Entities ========== */
+
+message Player {
+  int32 id = 1;
+  string name = 2;
+  PlayerColor color = 3;
+  string symbol = 4;
+}
+
+message Board {
+  int32 id = 1;
+  int32 size = 2;
+  repeated Row rows = 3;
+}
+
+message Game {
+  int32 id = 1;
+  string white_player_name = 2;
+  string black_player_name = 3;
+  int32 board_size = 4;
+
+  GameStatus status = 5;
+  PlayerColor current_player_color = 6;
+  PlayerColor winner_color = 7;
+
+  repeated Row rows = 8; // состояние доски (cells)
+}
+
+message Move {
+  int32 id = 1;
+  int32 game_id = 2;
+  int32 from_row = 3;
+  int32 from_col = 4;
+  int32 to_row = 5;
+  int32 to_col = 6;
+
+  string piece = 7;
+  string notation = 8;
+  string player = 9; // display name (как в REST)
+}
+
+/* ========== Requests/Responses ========== */
+
+message CreatePlayerRequest {
+  string name = 1;
+  PlayerColor color = 2;
+}
+
+message UpdatePlayerRequest {
+  int32 id = 1;
+  string name = 2;
+  PlayerColor color = 3;
+}
+
+message ListPlayersResponse {
+  repeated Player items = 1;
+}
+
+message CreateBoardRequest {
+  int32 size = 1;
+}
+
+message UpdateBoardRequest {
+  int32 id = 1;
+  int32 size = 2;
+  repeated Row rows = 3;
+}
+
+message ListBoardsResponse {
+  repeated Board items = 1;
+}
+
+message CreateGameRequest {
+  string white_player_name = 1;
+  string black_player_name = 2;
+  int32 board_size = 3;
+}
+
+message UpdateGameRequest {
+  int32 id = 1;
+  string white_player_name = 2;
+  string black_player_name = 3;
+  int32 board_size = 4;
+  GameStatus status = 5;
+}
+
+message ListGamesResponse {
+  repeated Game items = 1;
+}
+
+message CreateMoveRequest {
+  int32 game_id = 1;
+
+  // либо нотация, либо координаты
+  string notation = 2;
+
+  int32 from_row = 3;
+  int32 from_col = 4;
+  int32 to_row = 5;
+  int32 to_col = 6;
+}
+
+message UpdateMoveRequest {
+  int32 id = 1;
+  int32 game_id = 2;
+  int32 from_row = 3;
+  int32 from_col = 4;
+  int32 to_row = 5;
+  int32 to_col = 6;
+  string piece = 7;
+}
+
+message ListMovesRequest {
+  int32 game_id = 1; // 0 = все
+}
+
+message ListMovesResponse {
+  repeated Move items = 1;
+}
+
+/* ========== Services ========== */
+
+service PlayerService {
+  rpc CreatePlayer(CreatePlayerRequest) returns (Player);
+  rpc UpdatePlayer(UpdatePlayerRequest) returns (Player);
+  rpc DeletePlayer(DeleteByIdRequest) returns (Empty);
+  rpc GetPlayer(GetByIdRequest) returns (Player);
+  rpc ListPlayers(ListRequest) returns (ListPlayersResponse);
+}
+
+service BoardService {
+  rpc CreateBoard(CreateBoardRequest) returns (Board);
+  rpc UpdateBoard(UpdateBoardRequest) returns (Board);
+  rpc DeleteBoard(DeleteByIdRequest) returns (Empty);
+  rpc GetBoard(GetByIdRequest) returns (Board);
+  rpc ListBoards(ListRequest) returns (ListBoardsResponse);
+}
+
+service GameService {
+  rpc CreateGame(CreateGameRequest) returns (Game);
+  rpc UpdateGame(UpdateGameRequest) returns (Game);
+  rpc DeleteGame(DeleteByIdRequest) returns (Empty);
+  rpc GetGame(GetByIdRequest) returns (Game);
+  rpc ListGames(ListRequest) returns (ListGamesResponse);
+}
+
+service MoveService {
+  rpc CreateMove(CreateMoveRequest) returns (Move);
+  rpc UpdateMove(UpdateMoveRequest) returns (Move);
+  rpc DeleteMove(DeleteByIdRequest) returns (Empty);
+  rpc GetMove(GetByIdRequest) returns (Move);
+  rpc ListMoves(ListMovesRequest) returns (ListMovesResponse);
+}
